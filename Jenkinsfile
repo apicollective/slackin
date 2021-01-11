@@ -62,14 +62,18 @@ pipeline {
 
     stage('Deploy Helm chart') {
       when { branch 'master' }
-      steps {
-        container('helm') {
-          script {
-          
-            new helmDeploy().deploy('slackin', VERSION.printable(), 300, 'apicollective')
-          
+      parallel {
+        
+        stage('deploy slackin') {
+          steps {
+            script {
+              container('helm') {
+                new helmDeploy().deploy('slackin', VERSION.printable())
+              }
+            }
           }
         }
+        
       }
     }
   }
