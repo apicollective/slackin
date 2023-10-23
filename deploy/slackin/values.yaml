@@ -22,6 +22,9 @@ resources:
 jvmOpts:
   enabled: false
 
+istio:
+  alb: true
+
 istioIngress:
   enabled: true
   gateways:
