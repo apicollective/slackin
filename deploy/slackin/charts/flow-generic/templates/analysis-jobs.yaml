@@ -1,0 +1,31 @@
+{{- if and ($.Values.rollout.enabled) ($.Values.rollout.jobAnalysis) }}
+{{- $fullName := include "deploy.fullname" . -}}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ $fullName }}-rollout-job-analysis
+spec:
+  metrics:
+  - name: {{ $.Values.rollout.jobAnalysis.name }}
+    interval: {{ $.Values.rollout.jobAnalysis.interval }}
+    failureCondition: result[0] >= 1
+    failureLimit: {{ default "0" $.Values.rollout.jobAnalysis.failureLimit }}
+    provider:
+      job:
+        spec:
+          backoffLimit: {{ default 0 $.Values.rollout.jobAnalysis.backoffLimit }}
+          template:
+            spec:
+              containers:
+              - name: {{ $.Values.rollout.jobAnalysis.name }}
+                image: {{ $.Values.rollout.jobAnalysis.image }}
+                imagePullPolicy: Always
+                command: {{ $.Values.rollout.jobAnalysis.command }}
+                {{- if $.Values.rollout.jobAnalysis.env }}
+                env: {{ toYaml $.Values.rollout.jobAnalysis.env | nindent 18 }}
+                {{- end }}
+              imagePullSecrets: {{ toYaml $.Values.imagePullSecrets | nindent 16 }}
+              restartPolicy: Never
+
+  {{- end }}
+---

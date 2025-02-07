@@ -1,0 +1,122 @@
+{{- if $.Values.rollout.enabled }}
+{{- $fullName := include "deploy.fullname" . -}}
+
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: {{ $fullName }}-rollout-analysis
+spec:
+  metrics:
+  {{- if $.Values.rollout.defaultAnalysis.errorRate }}
+  - name: error-rate
+    interval: {{ default "1m" $.Values.rollout.defaultAnalysis.errorRate.interval }}
+    successCondition: {{ $.Values.rollout.defaultAnalysis.errorRate.successCondition }}
+    failureLimit: {{ default "0" $.Values.rollout.defaultAnalysis.errorRate.failureLimit }}
+    provider:
+      datadog:
+        interval: {{ default "1m" $.Values.rollout.defaultAnalysis.errorRate.interval }}
+        query: >
+          sum:trace.akka_http.request.errors{
+            service:{{ $fullName }} AND
+            version:{{ $.Values.deployments.live.version }}
+            {{- if $.Values.rollout.defaultAnalysis.errorRate.filters }}
+              AND ({{ $.Values.rollout.defaultAnalysis.errorRate.filters }})
+            {{- end }}
+          }.as_count() /
+          sum:trace.akka_http.request.hits{
+            service:{{ $fullName }} AND
+            version:{{ $.Values.deployments.live.version }}
+            {{- if $.Values.rollout.defaultAnalysis.errorRate.filters }}
+              AND ({{ $.Values.rollout.defaultAnalysis.errorRate.filters }})
+            {{- end }}
+          }.as_count()
+  {{- end }}
+
+  {{- if $.Values.rollout.defaultAnalysis.avgResponseTime }}
+  - name: response-time-avg
+    interval: {{ default "1m" $.Values.rollout.defaultAnalysis.avgResponseTime.interval }}
+    successCondition: {{ $.Values.rollout.defaultAnalysis.avgResponseTime.successCondition }}
+    failureLimit: {{ default "0" $.Values.rollout.defaultAnalysis.avgResponseTime.failureLimit }}
+    provider:
+      datadog:
+        interval: {{ default "1m" $.Values.rollout.defaultAnalysis.avgResponseTime.interval }}
+        query: >
+          avg:trace.akka_http.request{
+            service:{{ $fullName }} AND
+            version:{{ $.Values.deployments.live.version }}
+            {{- if $.Values.rollout.defaultAnalysis.avgResponseTime.filters }}
+              AND ({{ $.Values.rollout.defaultAnalysis.avgResponseTime.filters }})
+            {{- end }}
+          }
+
+  {{- end }}
+
+  {{- if $.Values.rollout.defaultAnalysis.p50ResponseTime }}
+  - name: response-time-p50
+    interval: {{ default "1m" $.Values.rollout.defaultAnalysis.p50ResponseTime.interval }}
+    successCondition: {{ $.Values.rollout.defaultAnalysis.p50ResponseTime.successCondition }}
+    failureLimit: {{ default "0" $.Values.rollout.defaultAnalysis.p50ResponseTime.failureLimit }}
+    provider:
+      datadog:
+        interval: {{ default "1m" $.Values.rollout.defaultAnalysis.p50ResponseTime.interval }}
+        query: >
+          p50:trace.akka_http.request{
+            service:{{ $fullName }} AND
+            version:{{ $.Values.deployments.live.version }}
+            {{- if $.Values.rollout.defaultAnalysis.p50ResponseTime.filters }}
+              AND ({{ $.Values.rollout.defaultAnalysis.p50ResponseTime.filters }})
+            {{- end }}
+          }
+
+  {{- end }}
+
+  {{- if $.Values.rollout.defaultAnalysis.p95ResponseTime }}
+  - name: response-time-p95
+    interval: {{ default "1m" $.Values.rollout.defaultAnalysis.p95ResponseTime.interval }}
+    successCondition: {{ $.Values.rollout.defaultAnalysis.p95ResponseTime.successCondition }}
+    failureLimit: {{ default "0" $.Values.rollout.defaultAnalysis.p95ResponseTime.failureLimit }}
+    provider:
+      datadog:
+        interval: {{ default "1m" $.Values.rollout.defaultAnalysis.p95ResponseTime.interval }}
+        query: >
+          p95:trace.akka_http.request{
+            service:{{ $fullName }} AND
+            version:{{ $.Values.deployments.live.version }}
+            {{- if $.Values.rollout.defaultAnalysis.p95ResponseTime.filters }}
+              AND ({{ $.Values.rollout.defaultAnalysis.p95ResponseTime.filters }})
+            {{- end }}
+          }
+
+  {{- end }}
+
+  {{- if $.Values.rollout.defaultAnalysis.p99ResponseTime }}
+  - name: response-time-p99
+    interval: {{ default "1m" $.Values.rollout.defaultAnalysis.p99ResponseTime.interval }}
+    successCondition: {{ $.Values.rollout.defaultAnalysis.p99ResponseTime.successCondition }}
+    failureLimit: {{ default "0" $.Values.rollout.defaultAnalysis.p99ResponseTime.failureLimit }}
+    provider:
+      datadog:
+        interval: {{ default "1m" $.Values.rollout.defaultAnalysis.p99ResponseTime.interval }}
+        query: >
+          p99:trace.akka_http.request{
+            service:{{ $fullName }} AND
+            version:{{ $.Values.deployments.live.version }}
+            {{- if $.Values.rollout.defaultAnalysis.p99ResponseTime.filters }}
+              AND ({{ $.Values.rollout.defaultAnalysis.p99ResponseTime.filters }})
+            {{- end }}
+          }
+        
+  {{- end }}
+    
+  {{- range $analysis := .Values.rollout.analysis }}
+  - name: {{ $analysis.name }}
+    interval: {{ default "1m" $analysis.interval }}
+    successCondition: {{ $analysis.successCondition }}
+    failureLimit: {{ default "0" $analysis.failureLimit }}
+    provider:
+      datadog:
+        interval: {{ default "1m" $analysis.provider.datadog.interval | indent 10 }}
+        query: {{ $analysis.provider.datadog.query | indent 10 }}
+  {{- end }}
+{{- end }}
+---

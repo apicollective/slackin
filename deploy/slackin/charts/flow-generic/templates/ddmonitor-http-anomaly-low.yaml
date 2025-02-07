@@ -1,0 +1,96 @@
+{{- $fullName := include "deploy.fullname" . -}}
+{{- $ddmonitors := .Values.datadogMonitors -}}
+
+{{- $warningnotiftarget := printf "@miguel.arias@global-e.com" -}}
+{{- $alertnotiftarget := printf "@miguel.arias@global-e.com" -}}
+
+{{- range $monitortype := $ddmonitors }}
+{{- if eq $monitortype.type "trace.akka_http.request.hits-anomaly-low" }}
+
+apiVersion: datadoghq.com/v1alpha1
+kind: DatadogMonitor
+metadata:
+  {{- if $monitortype.name }}
+  name: {{ $fullName }}-hits-anomaly-low-{{ $monitortype.name }}
+  {{- else }}
+  name: {{ $fullName }}-hits-anomaly-low
+  {{- end }}
+  namespace: datadog
+spec:
+  options:
+    notifyAudit: true
+    renotifyInterval: 1440
+    thresholds:
+      {{- if $monitortype.warning }}
+      warning: "{{ default "0.3" $monitortype.warning.threshold }}"
+      {{- else }}
+      warning: "0.3"
+      {{- end }}
+      {{- if $monitortype.alert }}
+      critical: "{{ default "0.5" $monitortype.alert.threshold }}"
+      {{- else }}
+      critical: "0.5"
+      {{- end }}
+  query: >
+    {{ default "avg" $monitortype.monitorMainOperator }}(
+      {{ default "last_1h" $monitortype.interval }}
+    ):anomalies(
+      sum:trace.akka_http.request.hits{
+        env:live AND
+        service:{{ $fullName }}
+        {{- if $monitortype.filters }}
+          AND ({{ $monitortype.filters }})
+        {{- end }}
+      }.as_count(),
+      'agile',
+      1,
+      direction='below',
+      interval=20,
+      alert_window='last_10m',
+      seasonality='weekly',
+      timezone='utc',
+      count_default_zero='true'
+    ) >=
+    {{- if $monitortype.alert }}
+      {{ default "0.5"  $monitortype.alert.threshold }}
+    {{- else }}
+      0.5
+    {{- end }}
+  type: "query alert"
+  name: "[generated] Service {{ $fullName }} {{ default "" $monitortype.name }} has a lower number of hits than expected on env:live"
+  message: |
+    {{ $fullName }} {{ default "" $monitortype.name }} hits deviated too much from its usual value.
+
+    Comment: {{ default "\n" $monitortype.comment }} 
+
+    {{- if $monitortype.warning }}
+    {{ default $warningnotiftarget $monitortype.warning.notificationTarget }}
+    {{- else }}
+    {{ $warningnotiftarget }}
+    {{- end }}
+
+    {{ "{{" }}#is_alert{{ "}}" }}
+      {{- if $monitortype.alert }}
+      {{ default $alertnotiftarget $monitortype.alert.notificationTarget }}
+      {{- else }}
+      {{ $alertnotiftarget }}
+      {{- end }}
+    {{ "{{" }}/is_alert{{ "}}" }}
+          
+    {{ "{{" }}#is_alert_recovery{{ "}}" }}
+      {{- if $monitortype.alert }}
+      {{ default $alertnotiftarget $monitortype.alert.notificationTarget }}
+      {{- else }}
+      {{ $alertnotiftarget }}
+      {{- end }}
+    {{ "{{" }}/is_alert_recovery{{ "}}" }}
+
+  tags:
+    - "service:{{ $fullName }}"
+    - "env:live"
+    - "team:{{ $.Values.team }}"
+
+---
+
+{{- end }}
+{{- end }}

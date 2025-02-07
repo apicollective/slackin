@@ -1,0 +1,77 @@
+{{- $fullName := include "deploy.fullname" . -}}
+{{- if and ($.Values.istioIngress.enabled) ($.Values.istioIngress.gateways) -}}
+{{- range $gateway := .Values.istioIngress.gateways }}
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ $gateway.key }}
+  labels:
+    app.kubernetes.io/name: {{ include "deploy.name" $ }}
+    helm.sh/chart: {{ include "deploy.chart" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app: {{ include "deploy.name" $ }}
+  annotations:
+    kubernetes.io/ingress.class: "ingressgateway"
+    {{- if $gateway.dns }}
+    kubernetes.io/ingress.tld: {{ $gateway.tld | quote }}
+    {{- if $gateway.proxied }}
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
+    {{ else }}
+    external-dns.alpha.kubernetes.io/ttl: "120"
+    {{- end }}
+    {{- end }}
+    {{- if $.Values.istio.alb }}
+    {{- if eq $gateway.tld "api.flow.io" }}
+    external-dns.alpha.kubernetes.io/target: {{ $.Values.istio.albApiTarget | quote }}
+    external-dns.alpha.kubernetes.io/alias: "true"
+    {{- end }}
+    {{- if eq $gateway.tld "flow.io" }}
+    external-dns.alpha.kubernetes.io/target: {{ $.Values.istio.albFlowioTarget | quote }}
+    external-dns.alpha.kubernetes.io/alias: "true"
+    {{- end }}
+    {{- if eq $gateway.tld "dark.flow.io" }}
+    external-dns.alpha.kubernetes.io/target: {{ $.Values.istio.albDarkTarget | quote }}
+    external-dns.alpha.kubernetes.io/alias: "true"
+    {{- end }}
+    {{- if eq $gateway.tld "flo.pub" }}
+    external-dns.alpha.kubernetes.io/target: {{ $.Values.istio.albFlopubTarget | quote }}
+    external-dns.alpha.kubernetes.io/alias: "true"
+    {{- end }}
+    {{- if eq $gateway.tld "apibuilder.io" }}
+    external-dns.alpha.kubernetes.io/target: {{ $.Values.istio.albApibuilderTarget | quote }}
+    external-dns.alpha.kubernetes.io/alias: "true"
+    {{- end }}
+    {{- end }}
+
+spec:
+  selector:
+    istio: {{ $gateway.selector | default "ingressgateway" | quote }}
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP2
+      hosts:
+      {{- range $host := $gateway.hosts }}
+        - {{ $host | quote }}
+      {{- end }}
+      tls:
+        httpsRedirect: true
+    - port:
+        number: 443
+        name: {{ default "https" $gateway.httpsPortName }}
+      {{- if $.Values.service.httpsPort }}
+        protocol: HTTPS
+      tls:
+        mode: PASSTHROUGH
+      {{ else }}
+        protocol: HTTP2
+      {{- end }}
+      hosts:
+      {{- range $host := $gateway.hosts }}
+        - {{ $host | quote }}
+      {{- end }}
+---
+{{- end }}
+{{- end -}}

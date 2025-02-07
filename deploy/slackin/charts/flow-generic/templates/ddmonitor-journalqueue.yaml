@@ -1,0 +1,90 @@
+{{- $fullName := include "deploy.fullname" . -}}
+{{- $ddmonitors := .Values.datadogMonitors -}}
+
+{{- $warningnotiftarget := printf "@slack-team-%s-notifications" $.Values.team -}}
+{{- $alertnotiftarget := printf "@pagerduty-%s" $.Values.team  -}}
+
+{{- range $monitortype := $ddmonitors }}
+{{- if eq $monitortype.type  "flow.lib_postgres_play.db.journal_queue.lag_ms-avg" }}
+
+apiVersion: datadoghq.com/v1alpha1
+kind: DatadogMonitor
+metadata:
+  {{- if $monitortype.name }}
+  name: {{ $fullName }}-journalqueue-{{ $monitortype.name }}
+  {{- else }}
+  name: {{ $fullName }}-journalqueue
+  {{- end }}
+  namespace: datadog
+spec:
+  options:
+    notifyAudit: true
+    renotifyInterval: 1440
+    thresholds:
+      {{- if $monitortype.warning }}
+      warning: "{{ default "900000" $monitortype.warning.threshold }}"
+      {{- else }}
+      warning: "900000"
+      {{- end }}
+      {{- if $monitortype.alert }}
+      critical: "{{ default "3600000" $monitortype.alert.threshold }}"
+      {{- else }}
+      critical: "3600000"
+      {{- end }}
+    newGroupDelay: {{ default 600 $monitortype.newGroupDelay }}
+  query: >
+    {{ default "avg" $monitortype.monitorMainOperator }}(
+      {{ default "last_10m" $monitortype.interval }}
+    ):avg:flow.lib_postgres_play.db.journal_queue.lag_ms{
+      env:live AND
+      service:{{ $fullName }}
+      {{- if $monitortype.filters }}
+        AND ({{ $monitortype.filters }})
+      {{- end }}
+    } by {
+      fulltablename,
+      service
+    } >
+    {{- if $monitortype.alert }}
+      {{ default "3600000" $monitortype.alert.threshold }}
+    {{- else }}
+      3600000
+    {{- end }}
+  type: "query alert"
+  name: "[generated] Service {{ $fullName }} {{ default "" $monitortype.name }} db journal queue {{ "{{" }}fulltablename.name{{ "}}" }} processing lagging behind"
+  message: |
+    {{ $fullName }} {{ default "" $monitortype.name }} db journal queue {{ "{{" }}fulltablename.name{{ "}}" }} processing lagging behind.
+
+    Comment: {{ default "\n" $monitortype.comment }}
+
+    {{- if $monitortype.warning }}
+    {{ default $warningnotiftarget $monitortype.warning.notificationTarget }}
+    {{- else }}
+    {{ $warningnotiftarget }}
+    {{- end }}
+
+    {{ "{{" }}#is_alert{{ "}}" }}
+      {{- if $monitortype.alert }}
+      {{ default $alertnotiftarget $monitortype.alert.notificationTarget }}
+      {{- else }}
+      {{ $alertnotiftarget }}
+      {{- end }}
+    {{ "{{" }}/is_alert{{ "}}" }}
+          
+    {{ "{{" }}#is_alert_recovery{{ "}}" }}
+      {{- if $monitortype.alert }}
+      {{ default $alertnotiftarget $monitortype.alert.notificationTarget }}
+      {{- else }}
+      {{ $alertnotiftarget }}
+      {{- end }}
+    {{ "{{" }}/is_alert_recovery{{ "}}" }}
+
+  tags:
+    - "service:{{ $fullName }}"
+    - "env:live"
+    - "team:{{ $.Values.team }}"
+
+---
+
+{{- end }}
+{{- end }}

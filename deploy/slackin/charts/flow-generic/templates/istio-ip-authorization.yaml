@@ -1,0 +1,25 @@
+{{- if $.Values.istioIngress.authorizationPolicy.ipBlocks.ipList }}
+{{- $fullName := include "deploy.fullname" . -}}
+---
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ $fullName }}-ingress-policy
+  namespace: istio-system
+  annotations:
+    "istio.io/dry-run": "{{ $.Values.istioIngress.authorizationPolicy.dryRun }}"
+spec:
+  selector:
+    matchLabels:
+      app: istio-ingressgateway
+  action: {{ default "ALLOW" $.Values.istioIngress.authorizationPolicy.ipBlocks.action }}
+  rules:
+  - from:
+    - source:
+        ipBlocks: {{ toYaml $.Values.istioIngress.authorizationPolicy.ipBlocks.ipList | nindent 10 }}
+    to:
+    - operation:
+        hosts: {{ toYaml $.Values.istioIngress.authorizationPolicy.ipBlocks.hosts | nindent 10 }}
+          
+{{- end }}
+
