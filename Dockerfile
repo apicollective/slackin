@@ -1,4 +1,4 @@
-FROM flowdocker/node12:latest
+FROM flowcommerce/node12:latest
 
 ENV PORT 3000
 
