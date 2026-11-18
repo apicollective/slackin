@@ -53,6 +53,9 @@ deployments:
     maxUnavailable: 1
     serviceAccountName: "flow-prod-eks-apicollective-slackin-sa"
     serviceAccountIamRole: "arn:aws:iam::479720515435:role/flow-prod-eks-apicollective-role"
+    env:
+      - name: JAVA_TOOL_OPTIONS
+        value: "-XX:-UseBASE64Intrinsics"
 
 nodeSelector:
   karpenter/role: workers
